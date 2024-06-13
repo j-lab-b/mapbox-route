@@ -101,37 +101,57 @@
 
             const route = await getRoute(locations);
 
-            // Animationsvariablen
-            let startTime;
-            const speedFactor = 5000; // Zeit in ms für die gesamte Route
+            // Gesamte Route anzeigen
+            const bounds = new mapboxgl.LngLatBounds();
+            route.forEach(coord => bounds.extend(coord));
+            map.fitBounds(bounds, { padding: 50 });
 
-            // Route animieren
-            function animateLine(timestamp) {
-                if (!startTime) startTime = timestamp;
-                const progress = (timestamp - startTime) / speedFactor;
+            // Zeitverzögerung, bevor an Berlin herangezoomt wird
+            setTimeout(() => {
+                map.flyTo({
+                    center: [13.4225, 52.4726],
+                    zoom: 10,
+                    speed: 0.5,
+                    curve: 1,
+                    easing: function(t) {
+                        return t;
+                    }
+                });
 
-                const geojson = map.getSource('route')._data;
-                const coords = geojson.geometry.coordinates;
-                const animatedRoute = coords.slice(0, Math.min(Math.floor(progress * coords.length), coords.length));
+                // Zeitverzögerung für die Animation der Route
+                setTimeout(() => {
+                    let startTime;
+                    const speedFactor = 5000; // Zeit in ms für die gesamte Route
 
-                if (animatedRoute.length > 0) {
-                    map.getSource('route').setData({
-                        type: 'Feature',
-                        properties: {},
-                        geometry: {
-                            type: 'LineString',
-                            coordinates: animatedRoute
+                    // Route animieren
+                    function animateLine(timestamp) {
+                        if (!startTime) startTime = timestamp;
+                        const progress = (timestamp - startTime) / speedFactor;
+
+                        const geojson = map.getSource('route')._data;
+                        const coords = geojson.geometry.coordinates;
+                        const animatedRoute = coords.slice(0, Math.min(Math.floor(progress * coords.length), coords.length));
+
+                        if (animatedRoute.length > 0) {
+                            map.getSource('route').setData({
+                                type: 'Feature',
+                                properties: {},
+                                geometry: {
+                                    type: 'LineString',
+                                    coordinates: animatedRoute
+                                }
+                            });
                         }
-                    });
-                }
 
-                if (progress < 1) {
+                        if (progress < 1) {
+                            requestAnimationFrame(animateLine);
+                        }
+                    }
+
+                    // Animation starten
                     requestAnimationFrame(animateLine);
-                }
-            }
-
-            // Animation starten
-            requestAnimationFrame(animateLine);
+                }, 3000); // Zeitverzögerung für die Animation in ms (z.B. 3000 = 3 Sekunden)
+            }, 5000); // Zeitverzögerung für das Heranzoomen an Berlin in ms (z.B. 5000 = 5 Sekunden)
         });
     </script>
 </body>
