@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Animated Route with Multiple Stops</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .black-marker {
+            background-color: #000;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoidXBsYWIiLCJhIjoiY2x4ZGw5NzFrMDYxcTJwc2IzZGR0c2hsYiJ9.37SeYKxLrrdtovlNdQoU7A';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v10', // Monochrome style
+            center: [0, 52], // Mitteleuropa
+            zoom: 4
+        });
+
+        // Standorte definieren
+        const locations = [
+            { coordinates: [13.4225, 52.4726], name: 'Berlin Neukölln' },
+            { coordinates: [-0.4389, 51.681], name: "Golf at The Grove, Chandler's Cross" },
+            { coordinates: [-1.6079, 55.482], name: "Dunstanburgh Castle, Alnwick" },
+            { coordinates: [-3.156, 55.878], name: "golfclubs4cash, Loanhead" },
+            { coordinates: [-2.5105, 56.003], name: "Dunbar Golf Club, Dunbar" },
+            { coordinates: [-2.4754, 56.709], name: "Montrose Golf Links Ltd, Montrose" },
+            { coordinates: [-2.0902, 57.217], name: "Murcar Links Golf Club, Bridge of Don" },
+            { coordinates: [-2.091, 57.180], name: "Royal Aberdeen Golf Club, Bridge of Don" },
+            { coordinates: [-1.8465, 57.413], name: "Cruden Bay Golf Club, Cruden Bay" }
+        ];
+
+        // Route von der Mapbox Directions API abrufen
+        async function getRoute(locations) {
+            const coordinates = locations.map(location => location.coordinates.join(',')).join(';');
+            const query = await fetch(
+                `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&access_token=${mapboxgl.accessToken}`,
+                { method: 'GET' }
+            );
+            const json = await query.json();
+            const data = json.routes[0];
+            const route = data.geometry.coordinates;
+            const geojson = {
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                    type: 'LineString',
+                    coordinates: route
+                }
+            };
+            map.getSource('route').setData(geojson);
+            return route;
+        }
+
+        map.on('load', async () => {
+            map.addSource('route', {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: []
+                    }
+                }
+            });
+
+            map.addLayer({
+                id: 'route',
+                type: 'line',
+                source: 'route',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#000', // Schwarze Linie
+                    'line-width': 2 // Dünnere Linie
+                }
+            });
+
+            locations.forEach(location => {
+                const marker = document.createElement('div');
+                marker.className = 'black-marker';
+                new mapboxgl.Marker(marker)
+                    .setLngLat(location.coordinates)
+                    .setPopup(new mapboxgl.Popup().setText(location.name))
+                    .addTo(map);
+            });
+
+            const route = await getRoute(locations);
+
+            // Animationsvariablen
+            let startTime;
+            const speedFactor = 5000; // Zeit in ms für die gesamte Route
+
+            // Route animieren
+            function animateLine(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = (timestamp - startTime) / speedFactor;
+
+                const geojson = map.getSource('route')._data;
+                const coords = geojson.geometry.coordinates;
+                const animatedRoute = coords.slice(0, Math.min(Math.floor(progress * coords.length), coords.length));
+
+                if (animatedRoute.length > 0) {
+                    map.getSource('route').setData({
+                        type: 'Feature',
+                        properties: {},
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: animatedRoute
+                        }
+                    });
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateLine);
+                }
+            }
+
+            // Animation starten
+            requestAnimationFrame(animateLine);
+        });
+    </script>
+</body>
+</html>
